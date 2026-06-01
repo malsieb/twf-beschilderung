@@ -24,7 +24,7 @@ The map HTML is always fully regenerated.
 **Live URL:** https://malsieb.github.io/twf-beschilderung/
 
 Hosted on GitHub Pages (account: `malsieb`, repo: `twf-beschilderung`, public).
-The `docs/` folder is its own git repo, deployed from the `main` branch root.
+The entire project folder is the git repo; Pages serves from the `main` branch `/docs` folder.
 
 ### Publishing updates
 
@@ -42,10 +42,10 @@ GitHub Pages rebuilds automatically on push — changes are live within ~1 minut
 gh api repos/malsieb/twf-beschilderung/pages \
   --method POST \
   --field "source[branch]=main" \
-  --field "source[path]=/"
+  --field "source[path]=/docs"
 ```
 
-Equivalent to: GitHub repo → Settings → Pages → Deploy from branch → main / (root).
+Equivalent to: GitHub repo → Settings → Pages → Deploy from branch → main / docs.
 
 ---
 
@@ -59,9 +59,10 @@ TWF Beschilderung/
 ├── gps_overrides.json     # Manual GPS corrections (applied at generation time)
 ├── README.md              # This file
 └── docs/
-    ├── index.html           # The interactive map (open this in a browser)
+    ├── index.html         # The interactive map (open this in a browser)
     ├── thumbs/            # 300px-wide JPEG thumbnails (for map markers)
-    └── full/              # 1400px-wide JPEG images (for lightbox)
+    ├── full/              # 1400px-wide JPEG images (for lightbox)
+    └── videos/            # Web-optimised MP4s (1280px, CRF 28, faststart)
 ```
 
 ## Dependencies
@@ -228,7 +229,7 @@ def offset(lat, lon, north_m, east_m):
   `IMG_XXXX.jpg` pair if you need to force re-processing of that image.
 - MOV files: GPS is extracted from `com.apple.quicktime.location.ISO6709` ffprobe tag.
   The video frame shown in the lightbox is the first frame extracted by ffmpeg.
-  MOV files reference `../IMG_XXXX.MOV` (parent directory) for playback.
+  Videos are converted to `docs/videos/IMG_XXXX.mp4` (H.264, 1280px, CRF 28, faststart) for playback.
 - The grid (Planquadrat-Raster) recomputes automatically from all marker positions
   each time the map is generated. Cell labels will shift if the photo extent changes
   significantly — regenerate a reference printout after adding many new photos.
