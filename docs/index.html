@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TWF Beschilderung</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #1a1a1a; }
+  #map { width: 100vw; height: 100vh; }
+  .thumb-icon img { width: 60px; height: 60px; object-fit: cover;
+    border: 3px solid #fff; border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.6); cursor: pointer; display: block; }
+  .thumb-inner { position: relative; display: inline-block; }
+  .acc-fair img, img.acc-fair, .thumb-cluster img.acc-fair  { border-color: #e09600; }
+  .acc-poor img, img.acc-poor, .thumb-cluster img.acc-poor  { border-color: #d42020; }
+  /* Stacked cluster icon */
+  .thumb-cluster { position: relative; width: 72px; height: 72px; cursor: pointer; }
+  .thumb-cluster img {
+    position: absolute; width: 54px; height: 54px; object-fit: cover;
+    border: 2px solid #fff; border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  }
+  .thumb-cluster img:nth-child(1) { top:14px; left:0;   transform: rotate(-8deg); }
+  .thumb-cluster img:nth-child(2) { top:8px;  left:8px; transform: rotate(3deg);  }
+  .thumb-cluster img:nth-child(3) { top:2px;  left:14px;transform: rotate(-2deg); }
+  .thumb-cluster .cluster-count {
+    position: absolute; top: 0; right: 0;
+    background: #e55; color: #fff;
+    font-size: .72rem; font-weight: bold;
+    min-width: 20px; height: 20px; line-height: 20px;
+    padding: 0 4px; border-radius: 10px;
+    text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    pointer-events: none;
+  }
+  /* Lightbox */
+  #lb { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85);
+    z-index:9999; align-items:center; justify-content:center; flex-direction:column; }
+  #lb.open { display:flex; }
+  #lb img, #lb video { max-width:92vw; max-height:82vh; border-radius:6px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.8); }
+  #lb video { background:#000; }
+  #lb-img { display:block; }
+  #lb-vid { display:none; }
+  #lb-spinner {
+    width:52px; height:52px; border-radius:50%;
+    border:5px solid rgba(255,255,255,.2);
+    border-top-color:#fff;
+    animation: spin .7s linear infinite;
+    display:none;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  /* Grid overlay */
+  .grid-label {
+    font-size:.95rem; font-weight:700; color:rgba(60,60,60,.65);
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+    pointer-events:none; white-space:nowrap;
+  }
+  #lb-caption { color:#eee; margin-top:10px; font-size:.9rem; }
+  #lb-close {
+    position:absolute; top:0; right:0; color:#fff;
+    font-size:2rem; cursor:pointer; line-height:1;
+    padding:16px 20px; min-width:48px; min-height:48px;
+    display:flex; align-items:center; justify-content:center;
+    z-index:1;
+  }
+  #lb-prev, #lb-next {
+    position:absolute; top:0; bottom:0; color:#fff;
+    font-size:2.5rem; cursor:pointer; user-select:none;
+    display:flex; align-items:center; padding:0 16px;
+    min-width:56px;
+  }
+  #lb-prev { left:0; }
+  #lb-next { right:0; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<!-- Lightbox -->
+<div id="lb">
+  <span id="lb-close">&times;</span>
+  <span id="lb-prev">&#8249;</span>
+  <div id="lb-spinner"></div>
+  <img id="lb-img" src="" alt="">
+  <video id="lb-vid" controls playsinline></video>
+  <div id="lb-caption"></div>
+  <span id="lb-next">&#8250;</span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const markers = [
+  {
+    "name": "IMG_1227.HEIC",
+    "lat": 49.4724222,
+    "lon": 10.9310917,
+    "acc": 13.4,
+    "thumb": "thumbs/IMG_1227.jpg",
+    "full": "full/IMG_1227.jpg",
+    "type": "image",
+    "grid": "E2"
+  },
+  {
+    "name": "IMG_1228.HEIC",
+    "lat": 49.4724417,
+    "lon": 10.9308611,
+    "acc": 10.9,
+    "thumb": "thumbs/IMG_1228.jpg",
+    "full": "full/IMG_1228.jpg",
+    "type": "image",
+    "grid": "E2"
+  },
+  {
+    "name": "IMG_1229.HEIC",
+    "lat": 49.4723917,
+    "lon": 10.9307528,
+    "acc": 11.1,
+    "thumb": "thumbs/IMG_1229.jpg",
+    "full": "full/IMG_1229.jpg",
+    "type": "image",
+    "grid": "E2"
+  },
+  {
+    "name": "IMG_1230.HEIC",
+    "lat": 49.4717139,
+    "lon": 10.9242083,
+    "acc": 12.1,
+    "thumb": "thumbs/IMG_1230.jpg",
+    "full": "full/IMG_1230.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1231.HEIC",
+    "lat": 49.4717139,
+    "lon": 10.9242083,
+    "acc": 12.1,
+    "thumb": "thumbs/IMG_1231.jpg",
+    "full": "full/IMG_1231.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1232.HEIC",
+    "lat": 49.4716833,
+    "lon": 10.9234667,
+    "acc": 16.9,
+    "thumb": "thumbs/IMG_1232.jpg",
+    "full": "full/IMG_1232.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1233.HEIC",
+    "lat": 49.4710278,
+    "lon": 10.9204917,
+    "acc": 10.3,
+    "thumb": "thumbs/IMG_1233.jpg",
+    "full": "full/IMG_1233.jpg",
+    "type": "image",
+    "grid": "C3"
+  },
+  {
+    "name": "IMG_1234.HEIC",
+    "lat": 49.4710167,
+    "lon": 10.9204806,
+    "acc": 10.9,
+    "thumb": "thumbs/IMG_1234.jpg",
+    "full": "full/IMG_1234.jpg",
+    "type": "image",
+    "grid": "C3"
+  },
+  {
+    "name": "IMG_1235.HEIC",
+    "lat": 49.4710167,
+    "lon": 10.9204667,
+    "acc": 14.4,
+    "thumb": "thumbs/IMG_1235.jpg",
+    "full": "full/IMG_1235.jpg",
+    "type": "image",
+    "grid": "C3"
+  },
+  {
+    "name": "IMG_1236.HEIC",
+    "lat": 49.4710111,
+    "lon": 10.9204722,
+    "acc": 15.5,
+    "thumb": "thumbs/IMG_1236.jpg",
+    "full": "full/IMG_1236.jpg",
+    "type": "image",
+    "grid": "C3"
+  },
+  {
+    "name": "IMG_1237.HEIC",
+    "lat": 49.4722139,
+    "lon": 10.9207583,
+    "acc": 8.1,
+    "thumb": "thumbs/IMG_1237.jpg",
+    "full": "full/IMG_1237.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1238.HEIC",
+    "lat": 49.4734472,
+    "lon": 10.9197028,
+    "acc": 8.5,
+    "thumb": "thumbs/IMG_1238.jpg",
+    "full": "full/IMG_1238.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1239.HEIC",
+    "lat": 49.4734333,
+    "lon": 10.9197056,
+    "acc": 8.2,
+    "thumb": "thumbs/IMG_1239.jpg",
+    "full": "full/IMG_1239.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1240.HEIC",
+    "lat": 49.4734528,
+    "lon": 10.9196583,
+    "acc": 13.0,
+    "thumb": "thumbs/IMG_1240.jpg",
+    "full": "full/IMG_1240.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1241.HEIC",
+    "lat": 49.4735222,
+    "lon": 10.9167389,
+    "acc": 11.7,
+    "thumb": "thumbs/IMG_1241.jpg",
+    "full": "full/IMG_1241.jpg",
+    "type": "image",
+    "grid": "B2"
+  },
+  {
+    "name": "IMG_1242.HEIC",
+    "lat": 49.4736639,
+    "lon": 10.9154472,
+    "acc": 9.3,
+    "thumb": "thumbs/IMG_1242.jpg",
+    "full": "full/IMG_1242.jpg",
+    "type": "image",
+    "grid": "B2"
+  },
+  {
+    "name": "IMG_1243.HEIC",
+    "lat": 49.4743389,
+    "lon": 10.9156889,
+    "acc": 8.8,
+    "thumb": "thumbs/IMG_1243.jpg",
+    "full": "full/IMG_1243.jpg",
+    "type": "image",
+    "grid": "B2"
+  },
+  {
+    "name": "IMG_1244.HEIC",
+    "lat": 49.4747083,
+    "lon": 10.9179194,
+    "acc": 9.1,
+    "thumb": "thumbs/IMG_1244.jpg",
+    "full": "full/IMG_1244.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1245.HEIC",
+    "lat": 49.4742361,
+    "lon": 10.9188083,
+    "acc": 10.6,
+    "thumb": "thumbs/IMG_1245.jpg",
+    "full": "full/IMG_1245.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1246.HEIC",
+    "lat": 49.4750333,
+    "lon": 10.9202472,
+    "acc": 11.5,
+    "thumb": "thumbs/IMG_1246.jpg",
+    "full": "full/IMG_1246.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1247.HEIC",
+    "lat": 49.4751194,
+    "lon": 10.9202306,
+    "acc": 12.8,
+    "thumb": "thumbs/IMG_1247.jpg",
+    "full": "full/IMG_1247.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1248.HEIC",
+    "lat": 49.4750361,
+    "lon": 10.9203611,
+    "acc": 15.0,
+    "thumb": "thumbs/IMG_1248.jpg",
+    "full": "full/IMG_1248.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1249.HEIC",
+    "lat": 49.4749556,
+    "lon": 10.9209444,
+    "acc": 12.3,
+    "thumb": "thumbs/IMG_1249.jpg",
+    "full": "full/IMG_1249.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1251.HEIC",
+    "lat": 49.4749028,
+    "lon": 10.9209917,
+    "acc": 13.9,
+    "thumb": "thumbs/IMG_1251.jpg",
+    "full": "full/IMG_1251.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1252.HEIC",
+    "lat": 49.4766972,
+    "lon": 10.9235861,
+    "acc": 12.7,
+    "thumb": "thumbs/IMG_1252.jpg",
+    "full": "full/IMG_1252.jpg",
+    "type": "image",
+    "grid": "D1"
+  },
+  {
+    "name": "IMG_1253.HEIC",
+    "lat": 49.4743917,
+    "lon": 10.9203083,
+    "acc": 7.3,
+    "thumb": "thumbs/IMG_1253.jpg",
+    "full": "full/IMG_1253.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1254.HEIC",
+    "lat": 49.4747361,
+    "lon": 10.9180167,
+    "acc": 12.3,
+    "thumb": "thumbs/IMG_1254.jpg",
+    "full": "full/IMG_1254.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1255.HEIC",
+    "lat": 49.4752611,
+    "lon": 10.9193611,
+    "acc": 8.9,
+    "thumb": "thumbs/IMG_1255.jpg",
+    "full": "full/IMG_1255.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1256.HEIC",
+    "lat": 49.4752528,
+    "lon": 10.9194278,
+    "acc": 13.3,
+    "thumb": "thumbs/IMG_1256.jpg",
+    "full": "full/IMG_1256.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1257.HEIC",
+    "lat": 49.4752611,
+    "lon": 10.9194556,
+    "acc": 17.8,
+    "thumb": "thumbs/IMG_1257.jpg",
+    "full": "full/IMG_1257.jpg",
+    "type": "image",
+    "grid": "C2"
+  },
+  {
+    "name": "IMG_1258.HEIC",
+    "lat": 49.4735333,
+    "lon": 10.9134944,
+    "acc": 7.4,
+    "thumb": "thumbs/IMG_1258.jpg",
+    "full": "full/IMG_1258.jpg",
+    "type": "image",
+    "grid": "B2"
+  },
+  {
+    "name": "IMG_1259.HEIC",
+    "lat": 49.4708111,
+    "lon": 10.9117611,
+    "acc": 8.7,
+    "thumb": "thumbs/IMG_1259.jpg",
+    "full": "full/IMG_1259.jpg",
+    "type": "image",
+    "grid": "B3"
+  },
+  {
+    "name": "IMG_1261.HEIC",
+    "lat": 49.4699167,
+    "lon": 10.9227333,
+    "acc": 13.9,
+    "thumb": "thumbs/IMG_1261.jpg",
+    "full": "full/IMG_1261.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1262.HEIC",
+    "lat": 49.4691556,
+    "lon": 10.9248889,
+    "acc": 10.9,
+    "thumb": "thumbs/IMG_1262.jpg",
+    "full": "full/IMG_1262.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1263.HEIC",
+    "lat": 49.4699139,
+    "lon": 10.9243528,
+    "acc": 10.2,
+    "thumb": "thumbs/IMG_1263.jpg",
+    "full": "full/IMG_1263.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1264.HEIC",
+    "lat": 49.4701222,
+    "lon": 10.9235528,
+    "acc": 11.3,
+    "thumb": "thumbs/IMG_1264.jpg",
+    "full": "full/IMG_1264.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1265.HEIC",
+    "lat": 49.4705167,
+    "lon": 10.9232194,
+    "acc": 12.6,
+    "thumb": "thumbs/IMG_1265.jpg",
+    "full": "full/IMG_1265.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1266.HEIC",
+    "lat": 49.4704972,
+    "lon": 10.9231611,
+    "acc": 12.6,
+    "thumb": "thumbs/IMG_1266.jpg",
+    "full": "full/IMG_1266.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1267.HEIC",
+    "lat": 49.4705083,
+    "lon": 10.9231944,
+    "acc": 14.3,
+    "thumb": "thumbs/IMG_1267.jpg",
+    "full": "full/IMG_1267.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1268.HEIC",
+    "lat": 49.4705361,
+    "lon": 10.9232833,
+    "acc": 14.5,
+    "thumb": "thumbs/IMG_1268.jpg",
+    "full": "full/IMG_1268.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1269.HEIC",
+    "lat": 49.4716139,
+    "lon": 10.9242028,
+    "acc": 13.7,
+    "thumb": "thumbs/IMG_1269.jpg",
+    "full": "full/IMG_1269.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1270.HEIC",
+    "lat": 49.4717139,
+    "lon": 10.9242083,
+    "acc": 12.1,
+    "thumb": "thumbs/IMG_1270.jpg",
+    "full": "full/IMG_1270.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1271.HEIC",
+    "lat": 49.4702111,
+    "lon": 10.9249667,
+    "acc": 8.9,
+    "thumb": "thumbs/IMG_1271.jpg",
+    "full": "full/IMG_1271.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1272.HEIC",
+    "lat": 49.46905,
+    "lon": 10.9264806,
+    "acc": 17.9,
+    "thumb": "thumbs/IMG_1272.jpg",
+    "full": "full/IMG_1272.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1273.HEIC",
+    "lat": 49.4690389,
+    "lon": 10.9265056,
+    "acc": 19.9,
+    "thumb": "thumbs/IMG_1273.jpg",
+    "full": "full/IMG_1273.jpg",
+    "type": "image",
+    "grid": "D3"
+  },
+  {
+    "name": "IMG_1274.HEIC",
+    "lat": 49.4676167,
+    "lon": 10.9283722,
+    "acc": 7.9,
+    "thumb": "thumbs/IMG_1274.jpg",
+    "full": "full/IMG_1274.jpg",
+    "type": "image",
+    "grid": "E4"
+  },
+  {
+    "name": "IMG_1275.HEIC",
+    "lat": 49.4675917,
+    "lon": 10.9284167,
+    "acc": 9.6,
+    "thumb": "thumbs/IMG_1275.jpg",
+    "full": "full/IMG_1275.jpg",
+    "type": "image",
+    "grid": "E4"
+  },
+  {
+    "name": "IMG_1276.HEIC",
+    "lat": 49.4656444,
+    "lon": 10.9328444,
+    "acc": 14.2,
+    "thumb": "thumbs/IMG_1276.jpg",
+    "full": "full/IMG_1276.jpg",
+    "type": "image",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1277.HEIC",
+    "lat": 49.4661528,
+    "lon": 10.9337472,
+    "acc": 11.5,
+    "thumb": "thumbs/IMG_1277.jpg",
+    "full": "full/IMG_1277.jpg",
+    "type": "image",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1278.HEIC",
+    "lat": 49.466725,
+    "lon": 10.9322472,
+    "acc": 10.9,
+    "thumb": "thumbs/IMG_1278.jpg",
+    "full": "full/IMG_1278.jpg",
+    "type": "image",
+    "grid": "E4"
+  },
+  {
+    "name": "IMG_1280.HEIC",
+    "lat": 49.4654083,
+    "lon": 10.9321722,
+    "acc": 8.0,
+    "thumb": "thumbs/IMG_1280.jpg",
+    "full": "full/IMG_1280.jpg",
+    "type": "image",
+    "grid": "E4"
+  },
+  {
+    "name": "IMG_1281.HEIC",
+    "lat": 49.4644611,
+    "lon": 10.9317528,
+    "acc": 8.9,
+    "thumb": "thumbs/IMG_1281.jpg",
+    "full": "full/IMG_1281.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1282.HEIC",
+    "lat": 49.4644444,
+    "lon": 10.9317556,
+    "acc": 10.2,
+    "thumb": "thumbs/IMG_1282.jpg",
+    "full": "full/IMG_1282.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1283.HEIC",
+    "lat": 49.4644444,
+    "lon": 10.9317694,
+    "acc": 13.9,
+    "thumb": "thumbs/IMG_1283.jpg",
+    "full": "full/IMG_1283.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1284.HEIC",
+    "lat": 49.4631056,
+    "lon": 10.9301389,
+    "acc": 11.9,
+    "thumb": "thumbs/IMG_1284.jpg",
+    "full": "full/IMG_1284.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1285.HEIC",
+    "lat": 49.4630056,
+    "lon": 10.9300611,
+    "acc": 16.5,
+    "thumb": "thumbs/IMG_1285.jpg",
+    "full": "full/IMG_1285.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1286.HEIC",
+    "lat": 49.4627583,
+    "lon": 10.9299167,
+    "acc": 18.5,
+    "thumb": "thumbs/IMG_1286.jpg",
+    "full": "full/IMG_1286.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1287.HEIC",
+    "lat": 49.4619917,
+    "lon": 10.9302833,
+    "acc": 11.2,
+    "thumb": "thumbs/IMG_1287.jpg",
+    "full": "full/IMG_1287.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1288.HEIC",
+    "lat": 49.4602056,
+    "lon": 10.9291861,
+    "acc": 16.1,
+    "thumb": "thumbs/IMG_1288.jpg",
+    "full": "full/IMG_1288.jpg",
+    "type": "image",
+    "grid": "E6"
+  },
+  {
+    "name": "IMG_1289.HEIC",
+    "lat": 49.4601222,
+    "lon": 10.9291222,
+    "acc": 17.4,
+    "thumb": "thumbs/IMG_1289.jpg",
+    "full": "full/IMG_1289.jpg",
+    "type": "image",
+    "grid": "E6"
+  },
+  {
+    "name": "IMG_1290.HEIC",
+    "lat": 49.4599639,
+    "lon": 10.929075,
+    "acc": 12.3,
+    "thumb": "thumbs/IMG_1290.jpg",
+    "full": "full/IMG_1290.jpg",
+    "type": "image",
+    "grid": "E6"
+  },
+  {
+    "name": "IMG_1291.HEIC",
+    "lat": 49.46005,
+    "lon": 10.9290528,
+    "acc": 10.3,
+    "thumb": "thumbs/IMG_1291.jpg",
+    "full": "full/IMG_1291.jpg",
+    "type": "image",
+    "grid": "E6"
+  },
+  {
+    "name": "IMG_1292.HEIC",
+    "lat": 49.4601361,
+    "lon": 10.9290722,
+    "acc": 8.9,
+    "thumb": "thumbs/IMG_1292.jpg",
+    "full": "full/IMG_1292.jpg",
+    "type": "image",
+    "grid": "E6"
+  },
+  {
+    "name": "IMG_1293.HEIC",
+    "lat": 49.4617889,
+    "lon": 10.9291278,
+    "acc": 7.4,
+    "thumb": "thumbs/IMG_1293.jpg",
+    "full": "full/IMG_1293.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1294.HEIC",
+    "lat": 49.46285,
+    "lon": 10.9298694,
+    "acc": 16.8,
+    "thumb": "thumbs/IMG_1294.jpg",
+    "full": "full/IMG_1294.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1295.HEIC",
+    "lat": 49.4628056,
+    "lon": 10.9299722,
+    "acc": 10.6,
+    "thumb": "thumbs/IMG_1295.jpg",
+    "full": "full/IMG_1295.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1296.HEIC",
+    "lat": 49.4636028,
+    "lon": 10.9307861,
+    "acc": 3.6,
+    "thumb": "thumbs/IMG_1296.jpg",
+    "full": "full/IMG_1296.jpg",
+    "type": "image",
+    "grid": "E5"
+  },
+  {
+    "name": "IMG_1297.HEIC",
+    "lat": 49.4645624,
+    "lon": 10.9327198,
+    "acc": 15.0,
+    "thumb": "thumbs/IMG_1297.jpg",
+    "full": "full/IMG_1297.jpg",
+    "type": "image",
+    "grid": "F5"
+  },
+  {
+    "name": "IMG_1298.HEIC",
+    "lat": 49.4647028,
+    "lon": 10.9330028,
+    "acc": 5.7,
+    "thumb": "thumbs/IMG_1298.jpg",
+    "full": "full/IMG_1298.jpg",
+    "type": "image",
+    "grid": "F5"
+  },
+  {
+    "name": "IMG_1299.HEIC",
+    "lat": 49.4646861,
+    "lon": 10.9343889,
+    "acc": 6.4,
+    "thumb": "thumbs/IMG_1299.jpg",
+    "full": "full/IMG_1299.jpg",
+    "type": "image",
+    "grid": "F5"
+  },
+  {
+    "name": "IMG_1300.HEIC",
+    "lat": 49.4646861,
+    "lon": 10.9343889,
+    "acc": 6.4,
+    "thumb": "thumbs/IMG_1300.jpg",
+    "full": "full/IMG_1300.jpg",
+    "type": "image",
+    "grid": "F5"
+  },
+  {
+    "name": "IMG_1301.HEIC",
+    "lat": 49.4641,
+    "lon": 10.9357,
+    "acc": 10.0,
+    "thumb": "thumbs/IMG_1301.jpg",
+    "full": "full/IMG_1301.jpg",
+    "type": "image",
+    "grid": "F5"
+  },
+  {
+    "name": "IMG_1302.HEIC",
+    "lat": 49.4648465,
+    "lon": 10.9355264,
+    "acc": 15.0,
+    "thumb": "thumbs/IMG_1302.jpg",
+    "full": "full/IMG_1302.jpg",
+    "type": "image",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1303.HEIC",
+    "lat": 49.4660773,
+    "lon": 10.9352403,
+    "acc": 10.0,
+    "thumb": "thumbs/IMG_1303.jpg",
+    "full": "full/IMG_1303.jpg",
+    "type": "image",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1304.HEIC",
+    "lat": 49.4660773,
+    "lon": 10.9352403,
+    "acc": 10.0,
+    "thumb": "thumbs/IMG_1304.jpg",
+    "full": "full/IMG_1304.jpg",
+    "type": "image",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1305.HEIC",
+    "lat": 49.4655444,
+    "lon": 10.9361861,
+    "acc": 12.0,
+    "thumb": "thumbs/IMG_1305.jpg",
+    "full": "full/IMG_1305.jpg",
+    "type": "image",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1306.HEIC",
+    "lat": 49.4649417,
+    "lon": 10.9365778,
+    "acc": 28.2,
+    "thumb": "thumbs/IMG_1306.jpg",
+    "full": "full/IMG_1306.jpg",
+    "type": "image",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1308.HEIC",
+    "lat": 49.4651,
+    "lon": 10.9386,
+    "acc": 10.0,
+    "thumb": "thumbs/IMG_1308.jpg",
+    "full": "full/IMG_1308.jpg",
+    "type": "image",
+    "grid": "G4"
+  },
+  {
+    "name": "IMG_1310.HEIC",
+    "lat": 49.4647023,
+    "lon": 10.9389444,
+    "acc": 15.0,
+    "thumb": "thumbs/IMG_1310.jpg",
+    "full": "full/IMG_1310.jpg",
+    "type": "image",
+    "grid": "G5"
+  },
+  {
+    "name": "IMG_1311.HEIC",
+    "lat": 49.4647023,
+    "lon": 10.9389444,
+    "acc": 12.0,
+    "thumb": "thumbs/IMG_1311.jpg",
+    "full": "full/IMG_1311.jpg",
+    "type": "image",
+    "grid": "G5"
+  },
+  {
+    "name": "IMG_1312.HEIC",
+    "lat": 49.4641,
+    "lon": 10.9357,
+    "acc": 10.0,
+    "thumb": "thumbs/IMG_1312.jpg",
+    "full": "full/IMG_1312.jpg",
+    "type": "image",
+    "grid": "F5"
+  },
+  {
+    "name": "IMG_1314.HEIC",
+    "lat": 49.4641417,
+    "lon": 10.9482556,
+    "acc": 10.7,
+    "thumb": "thumbs/IMG_1314.jpg",
+    "full": "full/IMG_1314.jpg",
+    "type": "image",
+    "grid": "H5"
+  },
+  {
+    "name": "IMG_1315.HEIC",
+    "lat": 49.46415,
+    "lon": 10.9483111,
+    "acc": 6.6,
+    "thumb": "thumbs/IMG_1315.jpg",
+    "full": "full/IMG_1315.jpg",
+    "type": "image",
+    "grid": "H5"
+  },
+  {
+    "name": "IMG_1316.HEIC",
+    "lat": 49.4641528,
+    "lon": 10.9483167,
+    "acc": 5.8,
+    "thumb": "thumbs/IMG_1316.jpg",
+    "full": "full/IMG_1316.jpg",
+    "type": "image",
+    "grid": "H5"
+  },
+  {
+    "name": "IMG_1317.HEIC",
+    "lat": 49.4641806,
+    "lon": 10.9483333,
+    "acc": 6.7,
+    "thumb": "thumbs/IMG_1317.jpg",
+    "full": "full/IMG_1317.jpg",
+    "type": "image",
+    "grid": "H5"
+  },
+  {
+    "name": "IMG_1318.HEIC",
+    "lat": 49.4642,
+    "lon": 10.9482611,
+    "acc": 9.1,
+    "thumb": "thumbs/IMG_1318.jpg",
+    "full": "full/IMG_1318.jpg",
+    "type": "image",
+    "grid": "H5"
+  },
+  {
+    "name": "IMG_1319.HEIC",
+    "lat": 49.464175,
+    "lon": 10.9483139,
+    "acc": 13.7,
+    "thumb": "thumbs/IMG_1319.jpg",
+    "full": "full/IMG_1319.jpg",
+    "type": "image",
+    "grid": "H5"
+  },
+  {
+    "name": "IMG_1320.HEIC",
+    "lat": 49.4641417,
+    "lon": 10.9482556,
+    "acc": 10.0,
+    "thumb": "thumbs/IMG_1320.jpg",
+    "full": "full/IMG_1320.jpg",
+    "type": "image",
+    "grid": "H5"
+  },
+  {
+    "name": "IMG_1260.MOV",
+    "lat": 49.4709,
+    "lon": 10.9204,
+    "thumb": "thumbs/IMG_1260.jpg",
+    "full": "full/IMG_1260.jpg",
+    "video": "videos/IMG_1260.mp4",
+    "type": "video",
+    "grid": "C3"
+  },
+  {
+    "name": "IMG_1279.MOV",
+    "lat": 49.4667,
+    "lon": 10.9322,
+    "thumb": "thumbs/IMG_1279.jpg",
+    "full": "full/IMG_1279.jpg",
+    "video": "videos/IMG_1279.mp4",
+    "type": "video",
+    "grid": "E4"
+  },
+  {
+    "name": "IMG_1307.MOV",
+    "lat": 49.465,
+    "lon": 10.9368,
+    "thumb": "thumbs/IMG_1307.jpg",
+    "full": "full/IMG_1307.jpg",
+    "video": "videos/IMG_1307.mp4",
+    "type": "video",
+    "grid": "F4"
+  },
+  {
+    "name": "IMG_1309.MOV",
+    "lat": 49.4651,
+    "lon": 10.9386,
+    "thumb": "thumbs/IMG_1309.jpg",
+    "full": "full/IMG_1309.jpg",
+    "video": "videos/IMG_1309.mp4",
+    "type": "video",
+    "grid": "G4"
+  },
+  {
+    "name": "IMG_1313.MOV",
+    "lat": 49.4641,
+    "lon": 10.9357,
+    "thumb": "thumbs/IMG_1313.jpg",
+    "full": "full/IMG_1313.jpg",
+    "video": "videos/IMG_1313.mp4",
+    "type": "video",
+    "grid": "F5"
+  }
+];
+const gridParams = {"minLat": 49.457453905, "maxLat": 49.479207194999994, "minLon": 10.90627527, "maxLon": 10.95381913, "cols": 9, "rows": 6};
+
+const map = L.map('map', {maxZoom: 21}).setView([49.468257, 10.928446], 15);
+// All providers below work from file:// (no Referer enforcement)
+const esriTopo = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+  { attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+     maxZoom: 21, maxNativeZoom: 19 }
+);
+const cyclOsm = L.tileLayer(
+  'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+  { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | <a href="https://www.cyclosm.org">CyclOSM</a>',
+     subdomains: 'abc', maxZoom: 21, maxNativeZoom: 19 }
+);
+const cartoLayer = L.tileLayer(
+  'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+     subdomains: 'abcd', maxZoom: 21, maxNativeZoom: 20 }
+);
+const topoLayer = L.tileLayer(
+  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+  { attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+     subdomains: 'abc', maxZoom: 21, maxNativeZoom: 17 }
+);
+const satellite = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+     maxZoom: 21, maxNativeZoom: 19 }
+);
+const hikingOverlay = L.tileLayer(
+  'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
+  { attribution: '&copy; <a href="https://waymarkedtrails.org">Waymarked Trails</a>', maxZoom: 21, opacity: 0.8 }
+);
+
+// Grid overlay (letter-number cells, like a paper map)
+function buildGridLayer() {
+  const {minLat, maxLat, minLon, maxLon, cols, rows} = gridParams;
+  const latStep = (maxLat - minLat) / rows;
+  const lonStep = (maxLon - minLon) / cols;
+  const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const group = L.layerGroup();
+  const lineStyle = {color:'#555', weight:1, opacity:0.45, dashArray:'5 5', interactive:false};
+
+  for (let r = 0; r <= rows; r++)
+    L.polyline([[minLat + r*latStep, minLon],[minLat + r*latStep, maxLon]], lineStyle).addTo(group);
+  for (let c = 0; c <= cols; c++)
+    L.polyline([[minLat, minLon + c*lonStep],[maxLat, minLon + c*lonStep]], lineStyle).addTo(group);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const lat = maxLat - (r + 0.5) * latStep;
+      const lon = minLon + (c + 0.5) * lonStep;
+      L.marker([lat, lon], {
+        icon: L.divIcon({className:'', html:`<div class="grid-label">${ALPHA[c]}${r+1}</div>`, iconSize:[40,20], iconAnchor:[20,10]}),
+        interactive: false, keyboard: false
+      }).addTo(group);
+    }
+  }
+  return group;
+}
+const gridLayer = buildGridLayer();
+gridLayer.addTo(map);
+
+cyclOsm.addTo(map);
+L.control.layers(
+  { 'CyclOSM (Wege)': cyclOsm, 'Satellit': satellite, 'Esri Topo': esriTopo,
+     'CartoDB Voyager': cartoLayer, 'OpenTopoMap': topoLayer },
+  { 'Wanderwege-Overlay': hikingOverlay, 'Planquadrat-Raster': gridLayer },
+  { position: 'topright' }
+).addTo(map);
+
+// Haversine distance in metres between two lat/lon points
+function distM(a, b) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLon = toRad(b.lon - a.lon);
+  const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+const RADIUS_M = 20;
+
+// Lightbox state — group holds indices of markers in the current local set
+let lbGroup = [];
+let lbPos = 0;
+const lb = document.getElementById('lb');
+const lbImg = document.getElementById('lb-img');
+const lbVid = document.getElementById('lb-vid');
+const lbCap = document.getElementById('lb-caption');
+const lbSpinner = document.getElementById('lb-spinner');
+
+function showLbAt(pos) {
+  lbPos = (pos + lbGroup.length) % lbGroup.length;
+  const m = markers[lbGroup[lbPos]];
+  const isVideo = m.type === 'video';
+  const accStr = m.acc ? `  ·  ±${Math.round(m.acc)}m` : '';
+  lbCap.textContent = `${m.name}  ·  ${m.grid}${accStr}  (${lbPos + 1}/${lbGroup.length})`;
+
+  if (isVideo) {
+    lbImg.style.display = 'none';
+    lbSpinner.style.display = 'none';
+    lbVid.style.display = 'block';
+    lbVid.src = m.video;
+    lbVid.load();
+    lbVid.play();
+  } else {
+    lbVid.pause();
+    lbVid.src = '';
+    lbVid.style.display = 'none';
+    // Show spinner, hide stale image until new one loads
+    lbImg.style.display = 'none';
+    lbSpinner.style.display = 'block';
+    const nextSrc = m.full;
+    lbImg.onload = null;
+    lbImg.onload = () => {
+      if (lbImg.src.endsWith(nextSrc) || lbImg.src === nextSrc) {
+        lbSpinner.style.display = 'none';
+        lbImg.style.display = 'block';
+      }
+    };
+    lbImg.src = nextSrc;
+    // Already cached — onload may not fire again
+    if (lbImg.complete && lbImg.naturalWidth > 0) {
+      lbSpinner.style.display = 'none';
+      lbImg.style.display = 'block';
+    }
+  }
+}
+
+function openLb(i) {
+  // Start with all markers within RADIUS_M
+  const origin = markers[i];
+  const nearby = new Set(
+    markers
+      .map((m, idx) => ({ idx, d: distM(origin, m) }))
+      .filter(x => x.d <= RADIUS_M)
+      .map(x => x.idx)
+  );
+  // Also include any cluster siblings (same visual cluster as the clicked marker)
+  cluster.eachLayer(lyr => {
+    if (lyr._idx === i) {
+      const parent = lyr.__parent;
+      if (parent && parent.getAllChildMarkers) {
+        parent.getAllChildMarkers().forEach(m => nearby.add(m._idx));
+      }
+    }
+  });
+  lbGroup = [...nearby].sort((a, b) => a - b);
+  lbPos = lbGroup.indexOf(i);
+  showLbAt(lbPos);
+  lb.classList.add('open');
+}
+
+document.getElementById('lb-close').onclick = () => { lbVid.pause(); lb.classList.remove('open'); };
+document.getElementById('lb-prev').onclick = () => showLbAt(lbPos - 1);
+document.getElementById('lb-next').onclick = () => showLbAt(lbPos + 1);
+lb.addEventListener('click', e => { if (e.target === lb) { lbVid.pause(); lb.classList.remove('open'); } });
+document.addEventListener('keydown', e => {
+  if (!lb.classList.contains('open')) return;
+  if (e.key === 'Escape') { lbVid.pause(); lb.classList.remove('open'); }
+  if (e.key === 'ArrowLeft') showLbAt(lbPos - 1);
+  if (e.key === 'ArrowRight') showLbAt(lbPos + 1);
+});
+
+// Swipe gestures for mobile
+let touchX = null;
+lb.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, {passive: true});
+lb.addEventListener('touchend', e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  touchX = null;
+  if (Math.abs(dx) < 40) return;
+  dx < 0 ? showLbAt(lbPos + 1) : showLbAt(lbPos - 1);
+}, {passive: true});
+
+// Cluster group with stacked-thumbnail icons
+const cluster = L.markerClusterGroup({
+  maxClusterRadius: 50,
+  spiderfyOnMaxZoom: false,
+  showCoverageOnHover: false,
+  zoomToBoundsOnClick: false,
+  iconCreateFunction: function(c) {
+    const children = c.getAllChildMarkers().slice(0, 3);
+    const imgs = children.map(m => `<img src="${m._thumb}" alt="" class="${m._accClass}">`).join('');
+    return L.divIcon({
+      html: `<div class="thumb-cluster">${imgs}</div>`,
+      className: '',
+      iconSize: [72, 72],
+      iconAnchor: [36, 36]
+    });
+  }
+});
+
+// Cluster click → open lightbox with all children (sorted by index = filename order)
+cluster.on('clusterclick', e => {
+  lbGroup = e.layer.getAllChildMarkers()
+    .map(m => m._idx)
+    .sort((a, b) => a - b);
+  showLbAt(0);
+  lb.classList.add('open');
+});
+
+function accClass(acc) {
+  if (!acc || acc < 30) return '';
+  return acc >= 100 ? 'acc-poor' : 'acc-fair';
+}
+
+markers.forEach((m, i) => {
+  const icon = L.divIcon({
+    className: 'thumb-icon',
+    html: `<div class="thumb-inner ${accClass(m.acc)}"><img src="${m.thumb}" alt="${m.name}" title="${m.name}"></div>`,
+    iconSize: [64, 64],
+    iconAnchor: [32, 32]
+  });
+  const marker = L.marker([m.lat, m.lon], {icon});
+  marker._thumb = m.thumb;
+  marker._accClass = accClass(m.acc);
+  marker._idx = i;
+  marker.on('click', () => openLb(i));
+  cluster.addLayer(marker);
+});
+
+map.addLayer(cluster);
+
+// Fit map to all markers
+const coords = markers.map(m => [m.lat, m.lon]);
+if (coords.length > 1) map.fitBounds(coords, {padding: [40, 40]});
+</script>
+</body>
+</html>

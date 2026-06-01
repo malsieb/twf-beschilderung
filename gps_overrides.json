@@ -1,0 +1,4 @@
+{
+  "_comment": "Manual GPS corrections applied at map generation time. Add entries here to override EXIF values without touching source files.",
+  "_example": {"IMG_XXXX.HEIC": {"lat": 49.12345, "lon": 10.12345, "acc": 10.0}}
+}
